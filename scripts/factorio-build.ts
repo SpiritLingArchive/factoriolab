@@ -52,6 +52,7 @@ import {
   isTransportBeltPrototype,
   isUnlockRecipeModifier,
   ItemGroup,
+  PlanetPrototype,
   PlantPrototype,
   ProductPrototype,
   RecipePrototype,
@@ -285,6 +286,7 @@ async function processMod(): Promise<void> {
       | AnyItemPrototype
       | AnyEntityPrototype
       | FluidPrototype
+      | PlanetPrototype
       | SpaceLocationPrototype
       | SpaceConnectionPrototype
       | PlantPrototype,
@@ -913,14 +915,14 @@ async function processMod(): Promise<void> {
     recipeResultsMap[recipe.name] = products;
   }
 
-  const itemsUsedProtos = Array.from(itemsUsed.values()).map(
-    (key) => itemMap[key],
-  );
+  const itemsUsedProtos = Array.from(itemsUsed.values())
+    .map((key) => itemMap[key])
+    .filter((k) => k !== undefined);
 
   // Exclude any entities that are placed by the added items
   const placedEntities = new Set<string>();
   for (const proto of itemsUsedProtos) {
-    if (!isFluidPrototype(proto) && proto.place_result != null)
+    if (!isFluidPrototype(proto) && proto?.place_result != null)
       placedEntities.add(proto.place_result);
   }
 
@@ -1134,7 +1136,7 @@ async function processMod(): Promise<void> {
       if (proto.weight != null) {
         itemWeight[proto.name] = proto.weight;
       } else if (
-        proto.flags?.some((f) => f === 'only-in-cursor' || f === 'spawnable')
+        proto.flags?.some?.((f) => f === 'only-in-cursor' || f === 'spawnable')
       ) {
         itemWeight[proto.name] = 0;
       }
@@ -2018,7 +2020,7 @@ async function processMod(): Promise<void> {
 
   async function addAsteroidRecipe(
     key: string,
-    proto: SpaceLocationPrototype | SpaceConnectionPrototype,
+    proto: PlanetPrototype | SpaceLocationPrototype | SpaceConnectionPrototype,
   ): Promise<void> {
     if (proto.asteroid_spawn_definitions) {
       // Add asteroid mining recipe
@@ -2027,7 +2029,7 @@ async function processMod(): Promise<void> {
       const group = dataRaw['item-group'][subgroup.group];
       const fakeId = getFakeRecipeId(proto.name, `${key}-asteroid-collection`);
       const out: Entities<number> = {};
-      if (isSpaceLocationPrototype(proto)) {
+      if (isPlanetPrototype(proto) || isSpaceLocationPrototype(proto)) {
         name = getLocaleName(spaceLocationLocale, key);
         proto.asteroid_spawn_definitions.forEach((def) => {
           addAsteroidProbability(out, def.asteroid, def.probability);
@@ -2078,6 +2080,11 @@ async function processMod(): Promise<void> {
 
   for (const key of Object.keys(dataRaw['space-location'])) {
     const proto = dataRaw['space-location'][key];
+    await addAsteroidRecipe(key, proto);
+  }
+
+  for (const key of Object.keys(dataRaw['planet'])) {
+    const proto = dataRaw['planet'][key];
     await addAsteroidRecipe(key, proto);
   }
 
